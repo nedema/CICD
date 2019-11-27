@@ -269,12 +269,6 @@ resource "aws_codebuild_project" "cicd_project" {
       }
    }
 
-   // source {
-   //    type            = "GITHUB"
-   //    location        = "${var.gitrepo}"
-   //    git_clone_depth = 1
-   // }
-
    vpc_config {
       vpc_id = "${aws_vpc.main.id}"
 
