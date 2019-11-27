@@ -15,7 +15,7 @@ variable "repo_owner" {
 
 variable "region" {
   type        = string
-  default     = "us-east-1"
+  default     = "us-west-2"
 }
 
 variable "s3bucket" {
@@ -80,7 +80,7 @@ resource "aws_internet_gateway" "gw" {
 resource "aws_subnet" "public" {
     vpc_id                  = "${aws_vpc.main.id}"
     cidr_block              = "${var.cidrsubnet}"
-    availability_zone       = "us-east-1a"
+    availability_zone       = "us-west-2a"
     map_public_ip_on_launch = true
 }
 
