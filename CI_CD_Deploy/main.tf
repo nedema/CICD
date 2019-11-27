@@ -1,16 +1,16 @@
 provider "aws" {
-  version   = ">= 2.1.2"
+  version   = "~> 2.0"
   region    = "${var.region}"
 }
 
 variable "github_token" {
    type    = "string"
-   default = " "
+   default = "b8c2009813e6429575db8cfdcf7b61bf2216d9aa"
 }
 
 variable "repo_owner" {
    type    = "string"
-   default = ""
+   default = "nedema"
 }
 
 variable "region" {
@@ -20,26 +20,26 @@ variable "region" {
 
 variable "s3bucket" {
   type        = string
-  default     = "deploy_bucket"
+  default     = "helloworld-react-bucket"
 }
 
 variable "gitrepo" {
    type    = "string"
-   default = "gitrepo"
+   default = "reactapp"
 }
 
 variable "vpcidr" {
    type    = "string"
-   default = "192.168.0.0/24"
+   default = "10.10.0.0/16"
 }
 
 variable "keypair" {
    type    = "string"
    default = "~/.ssh/id_rsa.pub"
 }
-variable "cdirsubnet" {
+variable "cidrsubnet" {
    type    = "string"
-   default = "192.168.10.0/27" 
+   default = "10.10.0.0/24" 
 }
 
 variable "elastic_beanstalk_application_name" {
@@ -54,16 +54,17 @@ variable "elastic_beanstalk_environment_name" {
 
 
 resource "aws_vpc" "main" {
-   cidr_block  = "${vpcidr}"
+   cidr_block  = "${var.vpcidr}"
 }
 
 resource "aws_route_table" "public" {
   vpc_id = "${aws_vpc.main.id}"
+}
 
-  route {
-     cidr_block = "${vpcidr}"
-     gateway_id = "${aws_internet_gateway.gw.id}"
-  }
+resource "aws_route" "public_internet_gateway" {
+  route_table_id         = "${aws_route_table.public.id}"
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = "${aws_internet_gateway.gw.id}"
 }
 
 resource "aws_route_table_association" "public" {
@@ -91,6 +92,7 @@ resource "aws_key_pair" "key" {
 resource "aws_s3_bucket" "pipeline_bucket" {
   bucket = "${var.s3bucket}"
   acl    = "private"
+  region = "${var.region}"
 }
 
 resource "aws_iam_role" "pipeline_role" {
@@ -98,18 +100,18 @@ resource "aws_iam_role" "pipeline_role" {
 
   assume_role_policy = <<EOF
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "codepipeline.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    }
-  ]
+   "Version": "2012-10-17",
+   "Statement": [
+      {
+         "Effect": "Allow",
+         "Principal": {
+            "Service": "codepipeline.amazonaws.com"
+         },
+         "Action": "sts:AssumeRole"
+      }
+   ]
 }
-EOF
+   EOF
 }
 
 resource "aws_iam_role_policy" "pipeline_policy" {
@@ -117,38 +119,93 @@ resource "aws_iam_role_policy" "pipeline_policy" {
   role = "${aws_iam_role.pipeline_role.id}"
 
   policy = <<EOF
+{
+   "Version": "2012-10-17",
+   "Statement": [
       {
-      "Version": "2012-10-17",
-      "Statement": [
-         {
-            "Effect":"Allow",
-            "Action": [
+         "Effect": "Allow",
+         "Action": [
+            "s3:CreateBucket",
+            "s3:GetAccelerateConfiguration",
+            "s3:GetBucketAcl",
+            "s3:GetBucketCORS",
+            "s3:GetBucketLocation",
             "s3:GetObject",
             "s3:GetObjectVersion",
             "s3:GetBucketVersioning",
             "s3:PutObject"
-            ],
-            "Resource": [
+         ],
+         "Resource": [
             "${aws_s3_bucket.pipeline_bucket.arn}",
             "${aws_s3_bucket.pipeline_bucket.arn}/*"
-            ]
-         },
-         {
-            "Effect": "Allow",
-            "Action": [
+         ]
+      },
+      {
+         "Effect": "Allow",
+         "Action": [
             "codebuild:BatchGetBuilds",
             "codebuild:StartBuild"
-            ],
-            "Resource": "*"
-         }
-      ]
+         ],
+         "Resource": "*"
       }
+   ]
+}
    EOF
 }
 
-resource "aws_security_group_rule" "sg_rules" {
+resource "aws_iam_role_policy" "pipeline-bucket-access" {
+  name = "code-pipeline-bucket-access"
+  role = "${aws_iam_role.pipeline_role.id}"
+
+  policy = <<EOF
+{
+   "Version": "2012-10-17",
+   "Statement": [
+      {
+         "Effect": "Allow",
+         "Resource": [
+            "${aws_s3_bucket.pipeline_bucket.arn}",
+            "${aws_s3_bucket.pipeline_bucket.arn}/*"
+         ],
+         "Action": [
+            "s3:CreateBucket",
+            "s3:GetAccelerateConfiguration",
+            "s3:GetBucketAcl",
+            "s3:GetBucketCORS",
+            "s3:GetBucketLocation",
+            "s3:GetBucketLogging",
+            "s3:GetBucketNotification",
+            "s3:GetBucketPolicy",
+            "s3:GetBucketRequestPayment",
+            "s3:GetBucketTagging",
+            "s3:GetBucketVersioning",
+            "s3:GetBucketWebsite",
+            "s3:GetLifecycleConfiguration",
+            "s3:GetObject",
+            "s3:GetObjectAcl",
+            "s3:GetObjectTagging",
+            "s3:GetObjectTorrent",
+            "s3:GetObjectVersion",
+            "s3:GetObjectVersionAcl",
+            "s3:GetObjectVersionTagging",
+            "s3:GetObjectVersionTorrent",
+            "s3:GetReplicationConfiguration",
+            "s3:ListAllMyBuckets",
+            "s3:ListBucket",
+            "s3:ListBucketMultipartUploads",
+            "s3:ListBucketVersions",
+            "s3:ListMultipartUploadParts",
+            "s3:PutObject"
+         ]
+      }
+   ]
+}
+EOF
+}
+
+resource "aws_security_group" "sg_rules" {
   name              = "allow_rules"
-  vpc_id            = "${aws_vpc.vpc.id}"
+  vpc_id            = "${aws_vpc.main.id}"
 
    ingress {
       from_port         = 22
@@ -160,13 +217,6 @@ resource "aws_security_group_rule" "sg_rules" {
    ingress {
       from_port         = 8000
       to_port           = 8000
-      protocol          = "tcp"
-      cidr_blocks       = ["0.0.0.0/0"]
-   }
-
-   ingress {
-      from_port         = 3000
-      to_port           = 3000
       protocol          = "tcp"
       cidr_blocks       = ["0.0.0.0/0"]
    }
@@ -193,12 +243,7 @@ resource "aws_codebuild_project" "cicd_project" {
    service_role  = "${aws_iam_role.pipeline_role.arn}"
 
    artifacts {
-      type = "s3"
-   }
-
-   cache {
-      type     = "S3"
-      location = "${aws_s3_bucket.pipeline_bucket.bucket}"
+      type = "CODEPIPELINE"
    }
 
    environment {
@@ -206,6 +251,10 @@ resource "aws_codebuild_project" "cicd_project" {
       image                       = "aws/codebuild/standard:1.0"
       type                        = "LINUX_CONTAINER"
       image_pull_credentials_type = "CODEBUILD"
+   }
+
+   source {
+      type = "CODEPIPELINE"
    }
 
    logs_config {
@@ -220,14 +269,14 @@ resource "aws_codebuild_project" "cicd_project" {
       }
    }
 
-   source {
-      type            = "GITHUB"
-      location        = "${var.gitrepo}"
-      git_clone_depth = 1
-   }
+   // source {
+   //    type            = "GITHUB"
+   //    location        = "${var.gitrepo}"
+   //    git_clone_depth = 1
+   // }
 
    vpc_config {
-      vpc_id = "${aws_vpc.vpc.id}"
+      vpc_id = "${aws_vpc.main.id}"
 
       subnets = [
          "${aws_subnet.public.id}",
@@ -237,40 +286,6 @@ resource "aws_codebuild_project" "cicd_project" {
          "${aws_security_group.sg_rules.id}",
       ]
    }
-}
-
-resource "aws_codebuild_project" "project_cache" {
-  name          = "cicd-project-cache"
-  description   = "test_cicd_project_cache"
-  build_timeout = "5"
-  service_role  = "${aws_iam_role.example.arn}"
-
-  artifacts {
-    type = "NO_ARTIFACTS"
-  }
-
-  cache {
-    type  = "LOCAL"
-    modes = ["LOCAL_DOCKER_LAYER_CACHE", "LOCAL_SOURCE_CACHE"]
-  }
-
-  environment {
-    compute_type                = "BUILD_GENERAL1_SMALL"
-    image                       = "aws/codebuild/standard:1.0"
-    type                        = "LINUX_CONTAINER"
-    image_pull_credentials_type = "CODEBUILD"
-
-  }
-
-  source {
-    type            = "GITHUB"
-    location        = "${var.gitrepo}"
-    git_clone_depth = 1
-  }
-
-  tags = {
-    Environment = "Test"
-  }
 }
 
 resource "aws_codepipeline" "default" {
@@ -291,7 +306,7 @@ resource "aws_codepipeline" "default" {
       owner            = "ThirdParty"
       provider         = "GitHub"
       version          = "1"
-      output_artifacts = ["code"]
+      output_artifacts = ["source_output"]
 
       configuration = {
         OAuthToken           = "${var.github_token}"
@@ -312,8 +327,8 @@ resource "aws_codepipeline" "default" {
       provider = "CodeBuild"
       version  = "1"
 
-      input_artifacts  = ["code"]
-      output_artifacts = ["package"]
+      input_artifacts  = ["source_output"]
+      output_artifacts = ["build_output"]
 
       configuration = {
         ProjectName = "cicd_reactjs"
@@ -321,24 +336,21 @@ resource "aws_codepipeline" "default" {
     }
   }
 
-  dynamic "stage" {
-    for_each = var.elastic_beanstalk_application_name != "" && var.elastic_beanstalk_environment_name != "" ? ["true"] : []
-    content {
-      name = "Deploy"
+  stage {
+    name = "Deploy"
 
-      action {
-        name            = "Deploy"
-        category        = "Deploy"
-        owner           = "AWS"
-        provider        = "ElasticBeanstalk"
-        input_artifacts = ["package"]
-        version         = "1"
+    action {
+         name            = "Deploy"
+         category        = "Deploy"
+         owner           = "AWS"
+         provider        = "ElasticBeanstalk"
+         input_artifacts = ["build_output"]
+         version         = "1"
 
-        configuration = {
-          ApplicationName = var.elastic_beanstalk_application_name
-          EnvironmentName = var.elastic_beanstalk_environment_name
+         configuration = {
+            ApplicationName = "${var.elastic_beanstalk_application_name}"
+            EnvironmentName = "${var.elastic_beanstalk_environment_name}"
          }
       }
-    }
+   }
   }
-}
