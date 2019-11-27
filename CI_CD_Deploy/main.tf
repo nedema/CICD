@@ -5,7 +5,7 @@ provider "aws" {
 
 variable "github_token" {
    type    = "string"
-   default = "b8c2009813e6429575db8cfdcf7b61bf2216d9aa"
+   default = ""
 }
 
 variable "repo_owner" {
